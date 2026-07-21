@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YOLOv8 Burr Detection & Labeling</title>
+    <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-zinc-950 text-zinc-100 font-sans h-screen flex overflow-hidden">
+    <!-- Sidebar -->
+    <aside class="w-64 bg-zinc-900 border-r border-zinc-800 flex flex-col h-full shadow-2xl relative z-10">
+        <!-- Logo/Brand -->
+        <div class="p-6 border-b border-zinc-800 flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                <i class="ph ph-cpu text-xl"></i>
+            </div>
+            <h1 class="font-bold text-lg tracking-tight">YOLOv8 Vision</h1>
+        </div>
+        
+        <!-- Navigation -->
+        <nav class="flex-1 p-4 space-y-2">
+            <button id="nav-home" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-zinc-800/50 text-emerald-400 font-medium transition-all border border-zinc-700/50 shadow-inner text-left cursor-pointer">
+                <i class="ph ph-house text-xl"></i>
+                Ana Sayfa
+            </button>
+            <button id="nav-dashboard" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50 transition-all border border-transparent text-left cursor-pointer">
+                <i class="ph ph-squares-four text-xl"></i>
+                Dashboard
+            </button>
+            <button id="nav-list" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50 transition-all border border-transparent text-left cursor-pointer">
+                <i class="ph ph-list-bullets text-xl"></i>
+                Liste
+            </button>
+        </nav>
+        
+        <!-- System Status -->
+        <div class="p-4 m-4 rounded-xl bg-zinc-900 border border-zinc-800 shadow-sm">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-xs text-zinc-400 font-medium uppercase tracking-wider">RPi 5 Status</span>
+                <div class="flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span class="text-xs font-medium text-emerald-500">Connected</span>
+                </div>
+            </div>
+            <div class="text-xs text-zinc-500 font-mono">Temp: 42°C | CPU: 12%</div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-full bg-zinc-950 relative overflow-hidden">
+        <!-- Header -->
+        <header class="h-16 border-b border-zinc-900 bg-zinc-950/80 backdrop-blur-md flex items-center justify-between px-6 z-10 shrink-0">
+            <h2 id="page-title" class="text-xl font-semibold text-zinc-200">Burr Detection & Dataset Labeling</h2>
+            <div class="flex items-center gap-4">
+                <div class="text-sm text-zinc-400 flex items-center gap-2 font-mono bg-zinc-900/60 px-3 py-1.5 rounded-lg border border-zinc-800">
+                    <i class="ph ph-clock text-emerald-400"></i>
+                    <span id="current-time-display">--:--:--</span>
+                </div>
+                <div class="h-8 w-8 rounded-full bg-gradient-to-tr from-emerald-500 to-teal-400 p-0.5 cursor-pointer">
+                    <div class="w-full h-full rounded-full bg-zinc-900 flex items-center justify-center">
+                        <i class="ph ph-user text-zinc-300"></i>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Workspace Area: Home View -->
+        <div id="view-home" class="view-section flex-1 p-6 flex gap-6 overflow-hidden">
+            
+            <!-- Camera Stream Area (Central) -->
+            <div class="flex-1 bg-zinc-900 border border-zinc-800 rounded-2xl flex flex-col shadow-xl relative overflow-hidden group transition-all duration-300">
+                <!-- Top Left Controls -->
+                <div class="absolute top-4 left-4 z-10 flex gap-2">
+                    <button class="w-10 h-10 rounded-lg bg-zinc-900/80 backdrop-blur-md border border-zinc-700 flex items-center justify-center text-zinc-300 hover:text-white hover:bg-zinc-800 transition-all shadow-lg hover:shadow-emerald-500/10">
+                        <i class="ph ph-gear text-xl"></i>
+                    </button>
+                    <div class="flex bg-zinc-900/80 backdrop-blur-md border border-zinc-700 rounded-lg p-1 shadow-lg">
+                        <button class="px-4 py-1.5 rounded-md bg-zinc-800 text-white font-medium text-sm flex items-center gap-2 transition-colors">
+                            <span class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                            Canlı
+                        </button>
+                        <button class="px-4 py-1.5 rounded-md text-zinc-400 hover:text-zinc-200 font-medium text-sm transition-colors">
+                            Foto
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Feed / Image -->
+                <div class="flex-1 bg-zinc-950 relative overflow-hidden flex items-center justify-center">
+                    <img src="assets/inspection.png" alt="Live Camera Feed" class="w-full h-full object-cover opacity-80 mix-blend-screen scale-105 group-hover:scale-100 transition-transform duration-700">
+                    
+                    <!-- Crosshair / Reticle Overlay -->
+                    <div class="absolute inset-0 pointer-events-none opacity-20">
+                        <div class="absolute top-1/2 left-0 w-full h-[1px] bg-emerald-500"></div>
+                        <div class="absolute left-1/2 top-0 w-[1px] h-full bg-emerald-500"></div>
+                        <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 border border-emerald-500 rounded-full"></div>
+                    </div>
+                    
+                    <!-- Bounding Box Simulation (Hidden by default, shown after analysis) -->
+                    <div id="bounding-box" class="absolute top-[40%] left-[45%] w-32 h-24 border-2 border-emerald-500 bg-emerald-500/10 hidden shadow-[0_0_15px_rgba(16,185,129,0.3)] backdrop-blur-[1px]">
+                        <div class="absolute -top-6 left-[-2px] bg-emerald-500 text-black text-xs font-bold px-2 py-0.5 rounded-tr-md">T11 - 80%</div>
+                    </div>
+                </div>
+
+                <div class="absolute bottom-6 right-6 z-10">
+                    <button id="analyze-btn" class="group relative px-6 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-lg flex items-center gap-3 transition-all shadow-[0_0_20px_rgba(16,185,129,0.3)] hover:shadow-[0_0_30px_rgba(16,185,129,0.5)] overflow-hidden">
+                        <div class="absolute inset-0 w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_1.5s_infinite]"></div>
+                        <i class="ph ph-scan text-2xl"></i>
+                        Çapağı Analiz Et
+                    </button>
+                </div>
+                
+                <!-- Scanning overlay effect -->
+                <div id="scan-overlay" class="absolute inset-0 bg-emerald-500/5 backdrop-blur-[1px] pointer-events-none translate-y-full border-t-2 border-emerald-500 shadow-[0_-10px_20px_rgba(16,185,129,0.2)]"></div>
+            </div>
+
+            <!-- AI Prediction Panel (Right Side, Initially Hidden or Empty) -->
+            <div id="prediction-panel" class="w-80 bg-zinc-900 border border-zinc-800 rounded-2xl flex flex-col shadow-xl opacity-50 translate-x-4 pointer-events-none transition-all duration-500 relative overflow-hidden">
+                <div class="p-5 border-b border-zinc-800 bg-zinc-900/90 sticky top-0 backdrop-blur z-10">
+                    <div class="flex items-center gap-2 mb-1">
+                        <i class="ph ph-brain text-emerald-400 text-xl"></i>
+                        <h3 class="font-semibold text-zinc-100">AI Predictions</h3>
+                    </div>
+                    <p class="text-xs text-zinc-400">YOLOv8 Model Results</p>
+                </div>
+
+                <div class="p-4 flex-1 overflow-y-auto space-y-3 custom-scrollbar">
+                    
+                    <!-- Prediction Rows (Will be animated in JS) -->
+                    <div id="prediction-list" class="space-y-3">
+                        <!-- Row 1 -->
+                        <div class="prediction-row hidden group bg-zinc-950 border border-zinc-800 rounded-xl p-3 flex items-center justify-between cursor-pointer hover:border-emerald-500/50 hover:bg-zinc-800/50 transition-all relative overflow-hidden" data-class="T11">
+                            <div class="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500 rounded-l-xl"></div>
+                            <div class="flex items-center gap-3 ml-2">
+                                <div class="w-10 h-10 rounded-lg bg-zinc-900 flex items-center justify-center font-mono font-bold text-emerald-400 border border-zinc-800">
+                                    T11
+                                </div>
+                                <div>
+                                    <div class="text-sm font-medium text-zinc-200">Burr Type 11</div>
+                                    <div class="text-xs text-zinc-500 font-mono">Confidence: <span class="text-emerald-400 font-semibold">80%</span></div>
+                                </div>
+                            </div>
+                            <button class="w-8 h-8 rounded-full bg-zinc-800 group-hover:bg-emerald-500 group-hover:text-zinc-950 flex items-center justify-center transition-colors text-zinc-400">
+                                <i class="ph ph-check font-bold"></i>
+                            </button>
+                        </div>
+                        
+                        <!-- Row 2 -->
+                        <div class="prediction-row hidden group bg-zinc-950 border border-zinc-800 rounded-xl p-3 flex items-center justify-between cursor-pointer hover:border-amber-500/50 hover:bg-zinc-800/50 transition-all relative overflow-hidden" data-class="T12">
+                            <div class="absolute left-0 top-0 bottom-0 w-1 bg-amber-500 rounded-l-xl"></div>
+                            <div class="flex items-center gap-3 ml-2">
+                                <div class="w-10 h-10 rounded-lg bg-zinc-900 flex items-center justify-center font-mono font-bold text-amber-400 border border-zinc-800">
+                                    T12
+                                </div>
+                                <div>
+                                    <div class="text-sm font-medium text-zinc-200">Burr Type 12</div>
+                                    <div class="text-xs text-zinc-500 font-mono">Confidence: <span class="text-amber-400 font-semibold">15%</span></div>
+                                </div>
+                            </div>
+                            <button class="w-8 h-8 rounded-full bg-zinc-800 group-hover:bg-amber-500 group-hover:text-zinc-950 flex items-center justify-center transition-colors text-zinc-400">
+                                <i class="ph ph-check font-bold"></i>
+                            </button>
+                        </div>
+                        
+                        <!-- Row 3 -->
+                        <div class="prediction-row hidden group bg-zinc-950 border border-zinc-800 rounded-xl p-3 flex items-center justify-between cursor-pointer hover:border-zinc-500/50 hover:bg-zinc-800/50 transition-all relative overflow-hidden" data-class="T13">
+                            <div class="absolute left-0 top-0 bottom-0 w-1 bg-zinc-600 rounded-l-xl"></div>
+                            <div class="flex items-center gap-3 ml-2">
+                                <div class="w-10 h-10 rounded-lg bg-zinc-900 flex items-center justify-center font-mono font-bold text-zinc-400 border border-zinc-800">
+                                    T13
+                                </div>
+                                <div>
+                                    <div class="text-sm font-medium text-zinc-200">Burr Type 13</div>
+                                    <div class="text-xs text-zinc-500 font-mono">Confidence: <span>5%</span></div>
+                                </div>
+                            </div>
+                            <button class="w-8 h-8 rounded-full bg-zinc-800 group-hover:bg-zinc-500 group-hover:text-zinc-950 flex items-center justify-center transition-colors text-zinc-400">
+                                <i class="ph ph-check font-bold"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Divider -->
+                    <div class="h-px bg-zinc-800 my-4 prediction-row hidden"></div>
+
+                    <!-- "OTHER" Option -->
+                    <div id="other-option" class="prediction-row hidden bg-zinc-950/50 border border-dashed border-zinc-700 rounded-xl p-4">
+                        <label class="block text-sm font-medium text-zinc-300 mb-2 flex items-center gap-2">
+                            <i class="ph ph-warning-circle text-amber-500"></i>
+                            Diğer (Manuel Seçim)
+                        </label>
+                        <p class="text-xs text-zinc-500 mb-3">Yapay zeka hatalıysa doğru çapak tipini listeden seçin.</p>
+                        <div class="relative">
+                            <select id="manual-class-select" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-2.5 text-zinc-200 text-sm appearance-none focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all cursor-pointer">
+                                <option value="" disabled selected>Seçiniz...</option>
+                                <option value="T11">T11 (Burr Type 11)</option>
+                                <option value="T12">T12 (Burr Type 12)</option>
+                                <option value="T13">T13 (Burr Type 13)</option>
+                                <option value="T14">T14 (Burr Type 14)</option>
+                                <option value="T15">T15 (Burr Type 15)</option>
+                            </select>
+                            <div class="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none text-zinc-400">
+                                <i class="ph ph-caret-down"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            
+        </div>
+
+        <!-- Dashboard View -->
+        <div id="view-dashboard" class="view-section flex-1 p-6 flex flex-col gap-6 overflow-y-auto custom-scrollbar hidden">
+            <!-- RECENTLY ADDED IMAGES TABLE -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl">
+                <div class="flex items-center justify-between mb-5">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
+                            <i class="ph ph-images text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-zinc-100">Son Eklenen Fotoğraflar</h3>
+                            <p class="text-xs text-zinc-400">Veri setine en son eklenen 5 görsel kaydı ve detayları</p>
+                        </div>
+                    </div>
+                    <span class="text-xs text-zinc-400 font-mono bg-zinc-950 border border-zinc-800 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                        <i class="ph ph-clock-counter-clockwise text-emerald-400"></i>
+                        Canlı Veri Akışı
+                    </span>
+                </div>
+
+                <!-- Table Container -->
+                <div class="overflow-x-auto rounded-xl border border-zinc-800/80 bg-zinc-950/60">
+                    <table class="w-full text-left text-sm border-collapse">
+                        <thead>
+                            <tr class="border-b border-zinc-800 bg-zinc-900/90 text-zinc-400 font-medium text-xs uppercase tracking-wider">
+                                <th class="py-3.5 px-5">Görsel</th>
+                                <th class="py-3.5 px-5">Çapak Sınıfı</th>
+                                <th class="py-3.5 px-5">Operatör / İsim</th>
+                                <th class="py-3.5 px-5">Tarih / Saat</th>
+                                <th class="py-3.5 px-5">Durum / Kaynak</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-images-tbody" class="divide-y divide-zinc-800/60 text-zinc-300">
+                            <!-- Populated in app.js -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Liste (Dataset Gallery) View -->
+        <div id="view-list" class="view-section flex-1 p-6 flex flex-col gap-6 overflow-y-auto custom-scrollbar hidden">
+            <!-- TOP SECTION: FILTER & SEARCH BAR -->
+            <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 shadow-xl flex flex-wrap items-center justify-between gap-4">
+                <div class="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+                    <!-- Class Filter Dropdown -->
+                    <div class="relative min-w-[160px]">
+                        <select id="gallery-class-filter" class="w-full bg-zinc-950 border border-zinc-800 text-zinc-200 text-sm rounded-xl px-3.5 py-2.5 appearance-none focus:outline-none focus:border-emerald-500 transition-colors cursor-pointer font-medium">
+                            <option value="ALL">Tüm Sınıflar</option>
+                            <option value="T11">T11 (Burr Type 11)</option>
+                            <option value="T12">T12 (Burr Type 12)</option>
+                            <option value="T13">T13 (Burr Type 13)</option>
+                            <option value="BOS">BOS (Boş / Zemin)</option>
+                        </select>
+                        <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-zinc-400">
+                            <i class="ph ph-caret-down"></i>
+                        </div>
+                    </div>
+
+                    <!-- Status Filter Dropdown -->
+                    <div class="relative min-w-[170px]">
+                        <select id="gallery-status-filter" class="w-full bg-zinc-950 border border-zinc-800 text-zinc-200 text-sm rounded-xl px-3.5 py-2.5 appearance-none focus:outline-none focus:border-emerald-500 transition-colors cursor-pointer font-medium">
+                            <option value="ALL">Tüm Kaynaklar</option>
+                            <option value="AI Confirmed">AI Confirmed</option>
+                            <option value="Manual Override">Manual Override</option>
+                        </select>
+                        <div class="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-zinc-400">
+                            <i class="ph ph-caret-down"></i>
+                        </div>
+                    </div>
+
+                    <!-- Search Input -->
+                    <div class="relative flex-1 min-w-[220px]">
+                        <div class="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-zinc-400">
+                            <i class="ph ph-magnifying-glass text-base"></i>
+                        </div>
+                        <input type="text" id="gallery-search-input" placeholder="Operatör veya Görsel ID Ara..." class="w-full bg-zinc-950 border border-zinc-800 text-zinc-200 text-sm rounded-xl pl-10 pr-4 py-2.5 focus:outline-none focus:border-emerald-500 transition-colors placeholder:text-zinc-500 font-sans">
+                    </div>
+                </div>
+
+                <!-- Total Counter Badge -->
+                <div class="px-4 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 font-mono flex items-center gap-2 shrink-0 shadow-inner">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span>Gösterilen:</span>
+                    <span id="gallery-total-count" class="font-bold text-emerald-400 text-sm">12 Görsel</span>
+                </div>
+            </div>
+
+            <!-- MAIN SECTION: IMAGE CARD GRID (GALERİ IZGARASI) -->
+            <div id="gallery-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                <!-- Cards dynamically populated via JS -->
+            </div>
+
+            <!-- BOTTOM SECTION: PAGINATION -->
+            <div class="flex items-center justify-between border-t border-zinc-800/80 pt-4 mt-auto">
+                <span class="text-xs text-zinc-500 font-mono" id="pagination-info">Toplam 12 görsel gösteriliyor</span>
+                <div class="flex items-center gap-2">
+                    <button id="page-prev-btn" class="px-3.5 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors text-xs font-mono disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer">
+                        <i class="ph ph-caret-left"></i> Önceki
+                    </button>
+                    <div class="px-3.5 py-1.5 rounded-xl bg-zinc-950 border border-zinc-800 text-xs font-mono text-zinc-300">
+                        Sayfa <span id="current-page-num" class="text-emerald-400 font-bold">1</span> / <span id="total-page-num">1</span>
+                    </div>
+                    <button id="page-next-btn" class="px-3.5 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors text-xs font-mono disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 cursor-pointer">
+                        Sonraki <i class="ph ph-caret-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Confirmation Modal Overlay -->
+    <div id="modal-overlay" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300">
+        <!-- Modal Content -->
+        <div id="modal-content" class="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl w-full max-w-lg scale-95 transition-transform duration-300 overflow-hidden">
+            <!-- Modal Header -->
+            <div class="px-6 py-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900">
+                <h3 class="text-lg font-semibold text-zinc-100 flex items-center gap-2">
+                    <i class="ph ph-floppy-disk text-emerald-400"></i>
+                    Veri Setine Ekle
+                </h3>
+                <button id="close-modal-btn" class="text-zinc-500 hover:text-white transition-colors">
+                    <i class="ph ph-x text-xl"></i>
+                </button>
+            </div>
+            
+            <!-- Modal Body -->
+            <div class="p-6 space-y-6 bg-zinc-950/50">
+                <!-- Thumbnail & Class Info -->
+                <div class="flex gap-4">
+                    <div class="w-32 h-24 rounded-lg overflow-hidden border border-zinc-700 shrink-0 relative group">
+                        <img src="assets/inspection.png" alt="Snapshot" class="w-full h-full object-cover">
+                        <!-- Simulated overlay -->
+                        <div class="absolute inset-0 bg-emerald-500/20 hidden group-hover:block transition-all"></div>
+                        <div class="absolute bottom-1 right-1 bg-black/70 text-[10px] px-1.5 py-0.5 rounded text-white font-mono" id="modal-timestamp">12:45:30</div>
+                    </div>
+                    <div class="flex flex-col justify-center">
+                        <div class="text-xs text-zinc-500 font-medium mb-1">Seçilen Sınıf (Label)</div>
+                        <div class="flex items-center gap-2 mb-2">
+                            <span id="modal-selected-class" class="px-3 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-md font-mono font-bold text-lg">T11</span>
+                        </div>
+                        <div class="text-xs text-zinc-400 flex items-center gap-1.5 font-mono">
+                            <i class="ph ph-calendar"></i>
+                            <span id="modal-date">2026-07-20</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Form Fields -->
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-zinc-400 mb-1.5">Hedef Veri Seti (Dataset)</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-500">
+                                <i class="ph ph-database"></i>
+                            </div>
+                            <input type="text" value="yolov8_burr_dataset_v3" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg pl-10 pr-4 py-2.5 text-zinc-300 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all font-mono" readonly>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-zinc-400 mb-1.5">Operatör / Dosya İsmi</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 flex items-center pl-3 text-zinc-500">
+                                <i class="ph ph-user"></i>
+                            </div>
+                            <input type="text" id="operator-name" placeholder="Örn: OPR-BERK-001" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg pl-10 pr-4 py-2.5 text-zinc-100 text-sm focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all placeholder:text-zinc-600">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="px-6 py-4 border-t border-zinc-800 bg-zinc-900 flex justify-end gap-3">
+                <button id="cancel-modal-btn" class="px-4 py-2.5 rounded-lg text-sm font-medium text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
+                    İptal
+                </button>
+                <button id="save-dataset-btn" class="px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold flex items-center gap-2 transition-all shadow-[0_0_15px_rgba(16,185,129,0.2)]">
+                    <i class="ph ph-check-circle"></i>
+                    Veri Setine Kaydet
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Detail Modal Overlay -->
+    <div id="detail-modal-overlay" class="fixed inset-0 bg-black/75 backdrop-blur-md z-50 flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300">
+        <div id="detail-modal-content" class="bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl w-full max-w-2xl scale-95 transition-transform duration-300 overflow-hidden flex flex-col max-h-[90vh]">
+            <!-- Header -->
+            <div class="px-6 py-4 border-b border-zinc-800 flex justify-between items-center bg-zinc-900">
+                <div class="flex items-center gap-3">
+                    <span id="detail-modal-class" class="px-3 py-1 rounded-md text-xs font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">T11</span>
+                    <h3 class="text-base font-bold text-zinc-100 font-mono" id="detail-modal-id">IMG_0052</h3>
+                </div>
+                <button id="close-detail-modal-btn" class="text-zinc-400 hover:text-white transition-colors">
+                    <i class="ph ph-x text-xl"></i>
+                </button>
+            </div>
+
+            <!-- Body -->
+            <div class="p-6 overflow-y-auto space-y-5 custom-scrollbar bg-zinc-950/40">
+                <!-- Large Image Preview -->
+                <div class="w-full h-64 rounded-xl overflow-hidden border border-zinc-800 bg-zinc-950 relative group flex items-center justify-center shadow-inner">
+                    <img id="detail-modal-img" src="assets/inspection.png" alt="Enlarged Preview" class="w-full h-full object-cover">
+                    <div class="absolute bottom-2 right-2 bg-black/70 backdrop-blur px-2.5 py-1 rounded text-xs font-mono text-zinc-300 border border-zinc-800" id="detail-modal-status-badge">
+                        AI Confirmed
+                    </div>
+                </div>
+
+                <!-- Metadata Cards Grid -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+                        <span class="text-[11px] text-zinc-500 uppercase tracking-wider block mb-1">Operatör</span>
+                        <div class="text-sm font-semibold text-zinc-200 flex items-center gap-2" id="detail-modal-operator">
+                            <i class="ph ph-user text-emerald-400"></i> Berk
+                        </div>
+                    </div>
+                    <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+                        <span class="text-[11px] text-zinc-500 uppercase tracking-wider block mb-1">Tarih / Saat</span>
+                        <div class="text-sm font-semibold text-zinc-200 font-mono flex items-center gap-2" id="detail-modal-time">
+                            <i class="ph ph-calendar-blank text-emerald-400"></i> 2026-07-21 14:30
+                        </div>
+                    </div>
+                    <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+                        <span class="text-[11px] text-zinc-500 uppercase tracking-wider block mb-1">Netlik Skoru</span>
+                        <div class="text-sm font-semibold text-emerald-400 font-mono flex items-center gap-2" id="detail-modal-focus">
+                            <i class="ph ph-sparkle"></i> 94.8 / 100
+                        </div>
+                    </div>
+                    <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+                        <span class="text-[11px] text-zinc-500 uppercase tracking-wider block mb-1">Çözünürlük / Format</span>
+                        <div class="text-sm font-semibold text-zinc-200 font-mono flex items-center gap-2" id="detail-modal-res">
+                            <i class="ph ph-frame-corners"></i> 1920x1080 PNG
+                        </div>
+                    </div>
+                </div>
+
+                <!-- File Path -->
+                <div class="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+                    <span class="text-[11px] text-zinc-500 uppercase tracking-wider block mb-1">Dosya Yolu (Dataset Path)</span>
+                    <div class="text-xs font-mono text-zinc-400 bg-zinc-950 p-2.5 rounded-lg border border-zinc-800/80 break-all select-all" id="detail-modal-path">
+                        ~/dataset/images/train/T11_0052.jpg
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Actions -->
+            <div class="px-6 py-4 border-t border-zinc-800 bg-zinc-900 flex items-center justify-between">
+                <button id="delete-detail-img-btn" class="px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer">
+                    <i class="ph ph-trash text-base"></i> Görseli Sil
+                </button>
+                <div class="flex items-center gap-3">
+                    <button id="close-detail-modal-footer-btn" class="px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-white transition-colors cursor-pointer">
+                        Kapat
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
